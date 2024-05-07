@@ -1,13 +1,4 @@
 import streamlit as st
-import torch
-from PIL import Image
-from pathlib import Path
-
-# Load YOLOv8 model
-@st.cache(allow_output_mutation=True)
-def load_model(model_path):
-    model = torch.hub.load('ultralytics/yolov8', 'custom', path=model_path)
-    return model
 
 def main():
     st.title("AI-Powered Watch Detection System")
@@ -31,16 +22,8 @@ def upload_image_page():
         st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
         if st.button("Detect Watches"):
-            # Load YOLOv8 model
-            model_path = "https://colab.research.google.com/drive/1eUkh3x9cIm1Gwyv1BQ1v30tk3fwYtsXU?usp=sharing"  # Update this with the path to your exported YOLOv5 model
-            model = load_model(model_path)
-
-            # Perform inference
-            image = Image.open(uploaded_file)
-            results = model(image)
-
-            # Display results
-            st.image(results.render(), caption="Detection Results", use_column_width=True)
+            # Placeholder for detection logic
+            st.write("Watch detection results will be displayed here.")
 
 def about_page():
     st.header("About")
