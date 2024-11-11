@@ -5,7 +5,6 @@ import zipfile
 import os
 import numpy as np
 from PIL import Image
-import shutil
 
 # Function to download and unzip the model file
 def download_and_extract_model():
@@ -21,6 +20,7 @@ def download_and_extract_model():
 
     # Download the zip file if it does not already exist
     if not os.path.exists(zip_path):
+        st.write("Downloading model zip file...")
         gdown.download(url, zip_path, quiet=False)
     
     # Extract the zip file if the .keras model file does not exist
@@ -29,13 +29,27 @@ def download_and_extract_model():
             zip_ref.extractall()
             st.write(f"Model extracted to: {model_path}")
     
+    # Check if the model file exists after extraction
+    if not os.path.exists(model_path):
+        st.error(f"Model extraction failed! Could not find '{model_path}'")
+        return None
+    
+    st.write(f"Model file found at: {model_path}")
     return model_path
 
 # Load the pre-trained U-Net model
 def load_model():
     model_path = download_and_extract_model()
-    model = tf.keras.models.load_model(model_path)
-    return model
+    if model_path is None:
+        return None
+    
+    try:
+        model = tf.keras.models.load_model(model_path)
+        st.write("Model loaded successfully!")
+        return model
+    except Exception as e:
+        st.error(f"Error loading the model: {e}")
+        return None
 
 def preprocess_image(image):
     """
@@ -93,6 +107,9 @@ def main():
     if uploaded_file is not None:
         # Load the model
         model = load_model()
+        if model is None:
+            st.error("Failed to load the model. Please check the model file.")
+            return
 
         # Open the uploaded image
         image = Image.open(uploaded_file)
