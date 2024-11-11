@@ -3,68 +3,71 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image, ImageOps
 import cv2
-import io
 import matplotlib.pyplot as plt
 
-# Load the pre-trained U-Net model from your Google Drive (replace with correct path)
-MODEL_PATH = '/content/drive/MyDrive/27_Oct_2024_Dataset_Creation/StratifiedDataset/newfiles_11Nov/unet-non-aug.keras'  # Example: '/content/drive/MyDrive/model/unet_watch_detection.h5'
+# Load the pre-trained U-Net model from Google Drive (ensure the path is correct)
+MODEL_PATH = 'unet-non-aug.keras'  # Update with your model path if necessary
 model = tf.keras.models.load_model(MODEL_PATH)
 
 def preprocess_image(image):
-    # Resize the image to 512x512
-    image = image.resize((512, 512))
-    # Convert image to numpy array
-    image_array = np.array(image)
-    # Normalize the image to [0, 1] for the model
-    image_array = image_array / 255.0
-    # Add batch dimension
-    image_array = np.expand_dims(image_array, axis=0)
+    """
+    Preprocess the uploaded image:
+    - Resize to 512x512
+    - Normalize to [0, 1] range
+    - Add batch dimension
+    """
+    image = image.resize((512, 512))  # Resize the image to 512x512
+    image_array = np.array(image)  # Convert the image to a numpy array
+    image_array = image_array / 255.0  # Normalize the image to [0, 1]
+    image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
     return image_array
 
 def segment_image(image):
-    # Preprocess the image
+    """
+    Segments the image using the pre-trained U-Net model:
+    - Preprocess the image
+    - Predict the mask (binary segmentation)
+    - Apply mask to colorize the watch area and grayscale the background
+    """
     preprocessed_image = preprocess_image(image)
+    prediction = model.predict(preprocessed_image)  # Make prediction with the model
+    prediction = np.squeeze(prediction, axis=0)  # Remove batch dimension
     
-    # Make prediction with the model
-    prediction = model.predict(preprocessed_image)
-    
-    # Squeeze the batch dimension
-    prediction = np.squeeze(prediction, axis=0)
-    
-    # Create the output image: color watch, grayscale background
-    # Convert the prediction to a binary mask (thresholding)
-    mask = prediction > 0.5  # Assuming binary segmentation
+    # Create binary mask from prediction (thresholding at 0.5)
+    mask = prediction > 0.5
     mask = np.expand_dims(mask, axis=-1)  # Add channel dimension for blending
     
-    # Create the original image and grayscale background
+    # Convert the input image to grayscale for background
     image_array = np.array(image)
     gray_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
-    gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2RGB)  # Convert grayscale to 3 channels
+    gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2RGB)  # Convert to 3-channel grayscale
     
-    # Apply the mask to retain the color on the watch and grayscale on the background
+    # Apply the mask: retain color on the watch and grayscale the background
     result = np.where(mask == 1, image_array, gray_image)
     
     return result
 
 def show_image(image):
-    # Display image using matplotlib (streamlit might not render images correctly otherwise)
+    """
+    Display the image in Streamlit using the proper color channels.
+    """
     st.image(image, channels="RGB", use_column_width=True)
 
 def main():
     st.title("Watch Detection App")
-    
+
     st.write("Upload an image to detect and segment the watch:")
-    
+
     # Upload file widget
     uploaded_file = st.file_uploader("Choose an image...", type="jpg, jpeg, png")
-    
+
     if uploaded_file is not None:
         # Open the uploaded image
         image = Image.open(uploaded_file)
-        
+
         # Segment the image using the U-Net model
         segmented_image = segment_image(image)
-        
+
         # Display the segmented result
         st.write("Segmented Image:")
         show_image(segmented_image)
