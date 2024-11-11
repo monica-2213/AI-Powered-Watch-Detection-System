@@ -1,56 +1,42 @@
 import streamlit as st
 import tensorflow as tf
 import gdown
+import zipfile
 import os
 import numpy as np
 from PIL import Image
-import zipfile
+import shutil
 
-# Download and unzip the model from Google Drive
-def download_model():
-    # Google Drive file ID (updated based on the new link)
-    model_id = '1Q97oFaLn8aC8aKJjkZQ-WIlJiLjKUQO1'
-    # URL to download the model
+# Function to download and unzip the model file
+def download_and_extract_model():
+    # Google Drive file ID
+    model_id = '1EAqFoUexroNtxyrxNXB_eoWYPTRPJw8c'
+    # URL to download the model zip file
     url = f'https://drive.google.com/uc?id={model_id}'
     
-    # Path to save the model zip file
-    model_zip_path = 'unet_model.zip'
-
-    # Download the model zip if not already present
-    if not os.path.exists(model_zip_path):
-        st.write(f"Downloading model from: {url}")
-        gdown.download(url, model_zip_path, quiet=False)
-    
-    # Extract the zip file if it's not already extracted
+    # Path to save the zip file
+    zip_path = 'unet-non-aug.zip'
+    # Path to extract the model file
     model_path = 'unet-non-aug.keras'
-    if not os.path.exists(model_path):
-        with zipfile.ZipFile(model_zip_path, 'r') as zip_ref:
-            zip_ref.extractall()
+
+    # Download the zip file if it does not already exist
+    if not os.path.exists(zip_path):
+        gdown.download(url, zip_path, quiet=False)
     
-    # Verify if the model path exists and is valid
+    # Extract the zip file if the .keras model file does not exist
     if not os.path.exists(model_path):
-        st.write("Model file does not exist or extraction failed.")
-        raise FileNotFoundError(f"Model file not found at {model_path}")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall()
+            st.write(f"Model extracted to: {model_path}")
     
     return model_path
 
 # Load the pre-trained U-Net model
 def load_model():
-    model_path = download_model()
-    st.write(f"Attempting to load model from: {model_path}")
-    
-    if os.path.exists(model_path):
-        try:
-            model = tf.keras.models.load_model(model_path)
-            st.write("Model loaded successfully.")
-            return model
-        except Exception as e:
-            st.write(f"Error loading the model: {str(e)}")
-            raise ValueError(f"Error loading the model: {str(e)}")
-    else:
-        st.write(f"Model path {model_path} does not exist.")
-        raise FileNotFoundError(f"Model file not found at {model_path}")
-    
+    model_path = download_and_extract_model()
+    model = tf.keras.models.load_model(model_path)
+    return model
+
 def preprocess_image(image):
     """
     Preprocess the uploaded image:
