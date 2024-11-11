@@ -1,117 +1,71 @@
 import streamlit as st
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from PIL import Image
-import io
-import matplotlib.pyplot as plt
+from PIL import Image, ImageOps
+import numpy as np
 
-# Load the U-Net model locally
-def load_model_from_local():
-    model = load_model('unet-non-aug.keras', custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef})
-    return model
+# Load the pre-trained model
+model = tf.keras.models.load_model('unet-non-aug.keras')
 
-# Preprocess the uploaded image using PIL (instead of cv2)
-def preprocess_image(image):
-    # Resize to the expected input size (512, 512)
-    image = image.resize((512, 512))  # PIL handles resizing (width, height)
-    # Convert the image to a NumPy array and normalize
-    image = np.array(image) / 255.0  # Scale pixel values to [0, 1]
-    # Expand dimensions to match model input shape
-    image = np.expand_dims(image, axis=0)  # Add batch dimension
-    return image
-
-# Predict the mask using the model
-def predict_mask(model, input_image):
-    predicted_mask = model.predict(input_image)
-    return predicted_mask
-
-# Display segmented output
-def display_output(original_image, binary_mask_resized, predicted_mask):
-    # Convert original image to grayscale for background
-    grayscale_image = original_image.convert("L")  # Convert to grayscale using PIL
-    grayscale_background = np.array(grayscale_image.convert("RGB"))  # Convert grayscale to RGB
+def process_image(image):
+    # Convert the image to RGB
+    image_rgb = image.convert('RGB')
     
-    # Create the segmented image by combining the color segments and grayscale background
-    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, np.array(original_image), grayscale_background)
+    # Resize to 512x512 for model input
+    image_resized = image_rgb.resize((512, 512))
     
-    # Plot the results
-    fig, axes = plt.subplots(1, 4, figsize=(20, 8))
+    # Convert image to numpy array and normalize it
+    image_array = np.array(image_resized) / 255.0  # Normalize the image (if the model was trained with this step)
+    image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
+    
+    # Perform prediction
+    prediction = model.predict(image_array)
+    return prediction[0], image_rgb.size  # Return both mask and original size
 
-    # Original image
-    axes[0].imshow(np.array(original_image))
-    axes[0].set_title('Original Image')
-    axes[0].axis('off')
+def segment_image(image):
+    # Convert the original image to grayscale (using PIL)
+    gray_image = image.convert('L')
+    
+    # Process the image through the model to get the segmentation mask
+    mask, original_size = process_image(image)
+    
+    # Convert the mask to binary (assumes binary segmentation)
+    mask_binary = mask > 0.5
+    
+    # Resize the mask back to the original image size
+    mask_resized = Image.fromarray((mask_binary.astype(np.uint8) * 255).astype(np.uint8))
+    mask_resized = mask_resized.resize(original_size, Image.BICUBIC)
+    
+    # Convert original image to numpy array for manipulation
+    image_array = np.array(image)
+    gray_image_array = np.array(gray_image)
+    
+    # Create an RGB output where the watch is in color and background is grayscale
+    segmented_image = image_array.copy()
+    segmented_image[~mask_binary] = np.stack([gray_image_array]*3, axis=-1)[~mask_binary]
+    
+    # Convert numpy array back to image
+    segmented_image_pil = Image.fromarray(segmented_image)
+    return segmented_image_pil
 
-    # Predicted segmentation mask
-    axes[1].imshow(binary_mask_resized, cmap='gray')
-    axes[1].set_title('Predicted Segmentation Mask')
-    axes[1].axis('off')
+def display_segmented_image(segmented_image):
+    # Display the segmented image
+    st.image(segmented_image, caption="Segmented Image (Watch in Color, Background in Grayscale)", use_column_width=True)
 
-    # Predicted probability map (optional)
-    predicted_mask_scaled = (predicted_mask[0] * 255).astype(np.uint8)
-    axes[2].imshow(predicted_mask_scaled, cmap='jet')
-    axes[2].set_title('Predicted Probability Map')
-    axes[2].axis('off')
+def main():
+    st.title('Watch Image Segmentation')
+    
+    uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+    
+    if uploaded_file is not None:
+        # Open and display the uploaded image
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Segmented area in color with grayscale background
-    axes[3].imshow(color_segmented_image)
-    axes[3].set_title('Segmented Area (Watch) in Color')
-    axes[3].axis('off')
+        # Segment the image
+        segmented_image = segment_image(image)
 
-    # Show plot in Streamlit
-    st.pyplot(fig)
+        # Display the segmented image
+        display_segmented_image(segmented_image)
 
-# Streamlit UI setup
-st.title("Watch Segmentation with U-Net")
-
-st.markdown("""
-    <style>
-        .main {
-            background-color: #F0F8FF;
-            color: #1E90FF;
-            font-family: Arial, sans-serif;
-        }
-        .upload-btn {
-            background-color: #32CD32;
-            color: white;
-            font-size: 16px;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        .upload-btn:hover {
-            background-color: #228B22;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.sidebar.header("Upload your image:")
-uploaded_file = st.sidebar.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-
-# Load the model locally
-model = load_model_from_local()
-
-if uploaded_file is not None:
-    # Convert the uploaded image to a PIL image
-    image = Image.open(uploaded_file)
-
-    # Preprocess the image
-    input_image = preprocess_image(image)
-
-    # Make predictions
-    predicted_mask = predict_mask(model, input_image)
-
-    # Post-process the prediction
-    predicted_mask = predicted_mask[0].squeeze()  # Remove batch and channel dimensions
-    threshold = 0.1  # Adjust threshold as needed
-    binary_mask = (predicted_mask > threshold).astype(np.uint8)
-
-    # Resize the mask to match the original image size
-    binary_mask_resized = np.array(Image.fromarray(binary_mask).resize(image.size))
-
-    # Display the results
-    display_output(image, binary_mask_resized, predicted_mask)
-
-    st.success("Segmentation completed successfully!")
-else:
-    st.info("Please upload an image to begin segmentation.")
+if __name__ == "__main__":
+    main()
