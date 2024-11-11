@@ -1,8 +1,8 @@
 import numpy as np
-import cv2
 import streamlit as st
 from tensorflow.keras.models import load_model
-import matplotlib.pyplot as plt
+from PIL import Image
+import io
 
 # Load your trained U-Net model
 model = load_model(
@@ -12,9 +12,9 @@ model = load_model(
 
 def preprocess_image(image):
     # Resize to the expected input size (512, 512)
-    image = cv2.resize(image, (512, 512))  # Note: (width, height) format
+    image = image.resize((512, 512))  # Resize using Pillow (width, height)
     # Normalize the image (if necessary)
-    image = image / 255.0  # Scale pixel values to [0, 1]
+    image = np.array(image) / 255.0  # Convert to numpy array and scale pixel values to [0, 1]
     # Expand dimensions to match model input shape
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
@@ -42,24 +42,27 @@ def segment_image(image):
 
 def display_results(original_image, binary_mask, predicted_mask):
     # Resize binary mask to match original image size if necessary
-    binary_mask_resized = cv2.resize(binary_mask, (original_image.shape[1], original_image.shape[0]))
+    binary_mask_resized = binary_mask  # Already has the same shape
 
-    # Create an image with the segmented area in color and the rest in grayscale
-    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    grayscale_background = cv2.cvtColor(grayscale_image, cv2.COLOR_GRAY2BGR)
+    # Convert the original image to grayscale using Pillow
+    grayscale_image = original_image.convert("L")
+    grayscale_image = np.array(grayscale_image)
+
+    # Create a grayscale background
+    grayscale_background = np.stack([grayscale_image] * 3, axis=-1)
 
     # Combine the color-segmented area with the grayscale background
-    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, original_image, grayscale_background)
+    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, np.array(original_image), grayscale_background)
 
     # Display the results using Streamlit
-    st.image(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB), caption="Original Image", use_column_width=True)
+    st.image(original_image, caption="Original Image", use_column_width=True)
 
     st.image(binary_mask_resized, caption="Predicted Segmentation Mask", use_column_width=True)
 
     predicted_mask_scaled = (predicted_mask * 255).astype(np.uint8)
     st.image(predicted_mask_scaled, caption="Predicted Probability Map", use_column_width=True, channels="BGR")
 
-    st.image(cv2.cvtColor(color_segmented_image, cv2.COLOR_BGR2RGB), caption="Segmented Area in Color with Grayscale Background", use_column_width=True)
+    st.image(color_segmented_image, caption="Segmented Area in Color with Grayscale Background", use_column_width=True)
 
 # Streamlit file uploader
 st.title("Watch Image Segmentation")
@@ -67,13 +70,11 @@ st.title("Watch Image Segmentation")
 uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
-    # Convert the uploaded file to a NumPy array
-    file_bytes = uploaded_file.read()
-    np_array = np.frombuffer(file_bytes, np.uint8)
-    original_image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    # Open the uploaded image using Pillow
+    image = Image.open(uploaded_file)
 
     # Segment the image
-    binary_mask, predicted_mask = segment_image(original_image)
+    binary_mask, predicted_mask = segment_image(image)
 
     # Display the results
-    display_results(original_image, binary_mask, predicted_mask)
+    display_results(image, binary_mask, predicted_mask)
