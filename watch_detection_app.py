@@ -1,63 +1,73 @@
-import os
-import gdown
 import streamlit as st
-import numpy as np
-import cv2
 import tensorflow as tf
+import numpy as np
+from PIL import Image, ImageOps
+import cv2
+import io
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import load_model
 
-# Function to download a model from Google Drive
-def download_model_from_gdrive(file_id, destination_path):
-    url = f'https://drive.google.com/uc?id={file_id}'
-    gdown.download(url, destination_path, quiet=False)
-
-# Google Drive file ID for your model
-model_url = 'https://drive.google.com/uc?id=1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4'
-file_id = model_url.split('=')[-1]
-model_path = 'unet-non-aug.keras'
-
-# Download the model if not already present
-if not os.path.exists(model_path):
-    download_model_from_gdrive(file_id, model_path)
-
-# Load the model
-model = load_model(model_path)
+# Load the pre-trained U-Net model from your Google Drive (replace with correct path)
+MODEL_PATH = '/content/drive/MyDrive/27_Oct_2024_Dataset_Creation/StratifiedDataset/newfiles_11Nov/unet-non-aug.keras'  # Example: '/content/drive/MyDrive/model/unet_watch_detection.h5'
+model = tf.keras.models.load_model(MODEL_PATH)
 
 def preprocess_image(image):
-    image = cv2.resize(image, (512, 512))  # Resize to match model input size
-    image = image / 255.0  # Normalize
-    image = np.expand_dims(image, axis=0)  # Add batch dimension
-    return image
+    # Resize the image to 512x512
+    image = image.resize((512, 512))
+    # Convert image to numpy array
+    image_array = np.array(image)
+    # Normalize the image to [0, 1] for the model
+    image_array = image_array / 255.0
+    # Add batch dimension
+    image_array = np.expand_dims(image_array, axis=0)
+    return image_array
 
-def upload_and_predict(image_file):
-    image_data = image_file.read()
-    np_arr = np.frombuffer(image_data, np.uint8)
-    original_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+def segment_image(image):
+    # Preprocess the image
+    preprocessed_image = preprocess_image(image)
+    
+    # Make prediction with the model
+    prediction = model.predict(preprocessed_image)
+    
+    # Squeeze the batch dimension
+    prediction = np.squeeze(prediction, axis=0)
+    
+    # Create the output image: color watch, grayscale background
+    # Convert the prediction to a binary mask (thresholding)
+    mask = prediction > 0.5  # Assuming binary segmentation
+    mask = np.expand_dims(mask, axis=-1)  # Add channel dimension for blending
+    
+    # Create the original image and grayscale background
+    image_array = np.array(image)
+    gray_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2RGB)  # Convert grayscale to 3 channels
+    
+    # Apply the mask to retain the color on the watch and grayscale on the background
+    result = np.where(mask == 1, image_array, gray_image)
+    
+    return result
 
-    input_image = preprocess_image(original_image)
-    predicted_mask = model.predict(input_image)
+def show_image(image):
+    # Display image using matplotlib (streamlit might not render images correctly otherwise)
+    st.image(image, channels="RGB", use_column_width=True)
 
-    # Process the output mask (assuming binary mask)
-    predicted_mask = predicted_mask[0].squeeze()
-    threshold = 0.1
-    binary_mask = (predicted_mask > threshold).astype(np.uint8)
+def main():
+    st.title("Watch Detection App")
+    
+    st.write("Upload an image to detect and segment the watch:")
+    
+    # Upload file widget
+    uploaded_file = st.file_uploader("Choose an image...", type="jpg, jpeg, png")
+    
+    if uploaded_file is not None:
+        # Open the uploaded image
+        image = Image.open(uploaded_file)
+        
+        # Segment the image using the U-Net model
+        segmented_image = segment_image(image)
+        
+        # Display the segmented result
+        st.write("Segmented Image:")
+        show_image(segmented_image)
 
-    binary_mask_resized = cv2.resize(binary_mask, (original_image.shape[1], original_image.shape[0]))
-    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    grayscale_background = cv2.cvtColor(grayscale_image, cv2.COLOR_GRAY2BGR)
-
-    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, original_image, grayscale_background)
-
-    # Display images
-    st.image(original_image, caption='Original Image', use_column_width=True)
-    st.image(binary_mask_resized, caption='Predicted Mask', use_column_width=True)
-    st.image(color_segmented_image, caption='Segmented Image', use_column_width=True)
-
-# Streamlit UI for file upload
-st.title("AI Powered Watch Detection System")
-
-uploaded_file = st.file_uploader("Choose an image...", type="jpg")
-
-if uploaded_file is not None:
-    upload_and_predict(uploaded_file)
+if __name__ == "__main__":
+    main()
