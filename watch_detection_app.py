@@ -12,22 +12,29 @@ else:
     print(f"Model file {model_path} not found!")
 
 def process_image(image):
-    # Convert the image to RGB
+    # Convert the image to RGB (if it is not already in RGB format)
     image_rgb = image.convert('RGB')
     
     # Resize to 512x512 for model input
     image_resized = image_rgb.resize((512, 512))
-    
-    # Convert image to numpy array and normalize it
+
+    # Convert the image to a numpy array and normalize the pixel values
     image_array = np.array(image_resized).astype(np.float32) / 255.0  # Normalize the image
-    
-    # Add batch and channel dimensions
+
+    # Check the shape of the image_array before prediction
+    print(f"Image shape before prediction: {image_array.shape}")
+
+    # If the model expects a specific channel (e.g., 1 for grayscale, 3 for RGB), add it
+    # Adding batch dimension (1,) and channels dimension (e.g., 3 for RGB)
     image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
-    image_array = np.expand_dims(image_array, axis=-1)  # Add channel dimension if necessary
     
+    # Ensure that the model expects 4D input, for example (1, 512, 512, 3)
+    if len(image_array.shape) == 3:
+        image_array = np.expand_dims(image_array, axis=-1)  # If needed, add channel dimension
+
     # Perform prediction
     prediction = model.predict(image_array)
-    
+
     return prediction[0], image_rgb.size  # Return both mask and original size
     
 
