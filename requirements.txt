@@ -1,5 +1,6 @@
-tensorflow
 streamlit
-gdown
-numpy
+tensorflow
+opencv-python
+matplotlib
 Pillow
+ipywidgets
