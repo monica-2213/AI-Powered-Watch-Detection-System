@@ -16,7 +16,7 @@ def download_and_extract_model():
     # Path to save the zip file
     zip_path = 'unet-non-aug.zip'
     # Path to extract the model file
-    model_path = 'unet-non-aug.zip'
+    model_path = 'unet-non-aug.keras'
 
     # Download the zip file if it does not already exist
     if not os.path.exists(zip_path):
