@@ -1,7 +1,6 @@
-tensorflow
-gdown
-opencv-python-headless
-pillow
-streamlit
-numpy
-matplotlib
+streamlit==1.20.0
+tensorflow==2.12.0
+Pillow==9.3.0
+numpy==1.24.2
+matplotlib==3.7.1
+opencv-python==4.7.0.72
