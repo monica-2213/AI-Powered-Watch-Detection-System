@@ -18,12 +18,14 @@ def download_and_extract_model():
         gdown.download(url, zip_path, quiet=False)
     
     if not os.path.exists(model_path):
+        st.write("Extracting model file...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall()
-            st.write(f"Model extracted to: {model_path}")
+            st.write(f"Model extracted.")
     
+    # Verify the model file exists after extraction
     if not os.path.exists(model_path):
-        st.error(f"Model extraction failed! Could not find '{model_path}'")
+        st.error(f"Model extraction failed! Could not find '{model_path}' after extraction.")
         return None
     
     st.write(f"Model file found at: {model_path}")
@@ -44,23 +46,23 @@ def load_model():
         return None
 
 def preprocess_image(image):
-    image = image.resize((512, 512))
+    image = image.resize((512, 512))  # Resize to match model input size
     image_array = np.array(image)
-    image_array = image_array / 255.0
-    image_array = np.expand_dims(image_array, axis=0)
+    image_array = image_array / 255.0  # Normalize the image
+    image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
     return image_array
 
 def segment_image(image, model):
     preprocessed_image = preprocess_image(image)
     prediction = model.predict(preprocessed_image)
-    prediction = np.squeeze(prediction, axis=0)
-    mask = prediction > 0.5
-    mask = np.expand_dims(mask, axis=-1)
+    prediction = np.squeeze(prediction, axis=0)  # Remove the batch dimension
+    mask = prediction > 0.5  # Threshold the prediction to create a binary mask
+    mask = np.expand_dims(mask, axis=-1)  # Ensure mask has same dimension as image
     
-    gray_image = np.array(image.convert('L'))
-    gray_image = np.stack([gray_image] * 3, axis=-1)
+    gray_image = np.array(image.convert('L'))  # Convert to grayscale
+    gray_image = np.stack([gray_image] * 3, axis=-1)  # Convert to 3 channels
     
-    result = np.where(mask == 1, np.array(image), gray_image)
+    result = np.where(mask == 1, np.array(image), gray_image)  # Apply mask to image
     
     return result
 
