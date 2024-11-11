@@ -1,13 +1,32 @@
 import streamlit as st
 import tensorflow as tf
+import gdown
+import os
 import numpy as np
 from PIL import Image, ImageOps
-#import cv2
 import matplotlib.pyplot as plt
 
-# Load the pre-trained U-Net model from Google Drive (ensure the path is correct)
-MODEL_PATH = 'unet-non-aug.keras'  # Update with your model path if necessary
-model = tf.keras.models.load_model(MODEL_PATH)
+# Download the model from Google Drive
+def download_model():
+    # Google Drive file ID
+    model_id = '1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4'
+    # URL to download the model
+    url = f'https://drive.google.com/uc?id={model_id}'
+    
+    # Path to save the model
+    model_path = 'unet-non-aug.keras'
+
+    # Download the model if it is not already present
+    if not os.path.exists(model_path):
+        gdown.download(url, model_path, quiet=False)
+
+    return model_path
+
+# Load the pre-trained U-Net model
+def load_model():
+    model_path = download_model()
+    model = tf.keras.models.load_model(model_path)
+    return model
 
 def preprocess_image(image):
     """
@@ -22,7 +41,10 @@ def preprocess_image(image):
     image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
     return image_array
 
-def segment_image(image):
+def segment_image(image, model):
+    """
+    Segment the uploaded image using the pre-trained U-Net model.
+    """
     # Preprocess the image
     preprocessed_image = preprocess_image(image)
     
@@ -60,11 +82,14 @@ def main():
     uploaded_file = st.file_uploader("Choose an image...", type="jpg, jpeg, png")
 
     if uploaded_file is not None:
+        # Load the model
+        model = load_model()
+
         # Open the uploaded image
         image = Image.open(uploaded_file)
 
         # Segment the image using the U-Net model
-        segmented_image = segment_image(image)
+        segmented_image = segment_image(image, model)
 
         # Display the segmented result
         st.write("Segmented Image:")
