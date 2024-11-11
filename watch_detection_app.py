@@ -22,8 +22,12 @@ def download_and_extract_model():
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall()
             st.write(f"Model extracted.")
+            st.write("Extracted files:", os.listdir())  # List the extracted files
     
     # Verify the model file exists after extraction
+    model_path = os.path.abspath(model_path)  # Use absolute path for better accuracy
+    st.write(f"Model file absolute path: {model_path}")
+    
     if not os.path.exists(model_path):
         st.error(f"Model extraction failed! Could not find '{model_path}' after extraction.")
         return None
