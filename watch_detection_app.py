@@ -19,12 +19,17 @@ def process_image(image):
     image_resized = image_rgb.resize((512, 512))
     
     # Convert image to numpy array and normalize it
-    image_array = np.array(image_resized) / 255.0  # Normalize the image (if the model was trained with this step)
+    image_array = np.array(image_resized).astype(np.float32) / 255.0  # Normalize the image
+    
+    # Add batch and channel dimensions
     image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
+    image_array = np.expand_dims(image_array, axis=-1)  # Add channel dimension if necessary
     
     # Perform prediction
     prediction = model.predict(image_array)
+    
     return prediction[0], image_rgb.size  # Return both mask and original size
+    
 
 def segment_image(image):
     # Convert the original image to grayscale (using PIL)
