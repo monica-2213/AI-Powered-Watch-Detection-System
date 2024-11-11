@@ -1,37 +1,70 @@
 import streamlit as st
 
-def main():
-    st.title("AI-Powered Watch Detection System")
-    st.sidebar.title("Navigation")
+# Customize CSS for extra styling
+st.markdown(
+    """
+    <style>
+    .main-header { font-size: 28px; color: #008080; font-weight: bold; }
+    .sub-header { font-size: 20px; color: #2D2D2D; }
+    .info-box { background-color: #66CCCC; padding: 20px; border-radius: 10px; color: #2D2D2D; }
+    .footer { text-align: center; font-size: 14px; color: #666666; margin-top: 50px; }
+    .btn-primary { background-color: #008080 !important; color: #FFFFFF !important; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-    # Sidebar options
-    page = st.sidebar.radio("Go to", ("Upload Image", "About"))
+# Main header
+st.markdown('<h1 class="main-header">AI-Powered Watch Detection System</h1>', unsafe_allow_html=True)
 
-    if page == "Upload Image":
-        upload_image_page()
-    elif page == "About":
-        about_page()
+# Introduction
+st.markdown('<p class="sub-header">Upload an image to detect and identify the watch in it.</p>', unsafe_allow_html=True)
 
-def upload_image_page():
-    st.header("Upload Image")
-    st.write("Upload an image containing watches to detect and classify them.")
+# Step 1: Upload Image
+st.header("Step 1: Upload Image")
+uploaded_file = st.file_uploader("Upload an image of the watch you want to detect:", type=["jpg", "png", "jpeg"])
+if uploaded_file:
+    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# Step 2: Image Pre-processing
+if uploaded_file:
+    st.header("Step 2: Image Pre-processing")
+    st.markdown(
+        '<div class="info-box">The image will be pre-processed to enhance detection accuracy. This includes resizing, contrast adjustment, and noise reduction.</div>',
+        unsafe_allow_html=True
+    )
 
-    if uploaded_file is not None:
-        st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+# Step 3: Watch Detection
+if uploaded_file:
+    st.header("Step 3: Watch Detection")
+    if st.button("Detect Watch", key="detect", help="Click to run the detection algorithm"):
+        # Placeholder for detection logic
+        st.success("Watch detected successfully!")
+        st.image("path_to_detected_watch_image.jpg", caption="Detection Result with Bounding Box")
 
-        if st.button("Detect Watches"):
-            # Placeholder for detection logic
-            st.write("Watch detection results will be displayed here.")
+# Step 4: Display Results with Bounding Boxes and Brand Details
+if uploaded_file:
+    st.header("Step 4: Display Results")
+    with st.expander("View Detection Details"):
+        st.write("### Bounding Box Coordinates")
+        st.write("- Top-left: (x1, y1)")
+        st.write("- Bottom-right: (x2, y2)")
+        st.write("### Detected Brand: Omega")
+        st.write("Confidence: 95%")
 
-def about_page():
-    st.header("About")
-    st.write("""
-        This is an AI-powered system designed to detect watches in images.
-        It leverages machine learning techniques for object detection to identify watches.
-        The system aims to assist collectors, retailers, and enthusiasts in cataloging and appraising watches efficiently.
-    """)
+# Step 5: View Results
+if uploaded_file:
+    st.header("Step 5: View Results")
+    st.markdown(
+        '<div class="info-box">The results include detected brand details and bounding boxes around the detected watch. This will assist in further analysis and recognition.</div>',
+        unsafe_allow_html=True
+    )
 
-if __name__ == "__main__":
-    main()
+# Step 6: Provide Feedback
+st.header("Step 6: Provide Feedback")
+st.text_area("Leave your feedback on the detection result to help us improve:", placeholder="Enter feedback here...")
+if st.button("Submit Feedback", key="feedback"):
+    st.success("Thank you for your feedback!")
+
+# Footer
+st.markdown('<div class="footer">Developed by Evangeline Monica (S2123599)</div>', unsafe_allow_html=True)
