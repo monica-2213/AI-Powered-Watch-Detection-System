@@ -1,6 +1,5 @@
 streamlit
 tensorflow
-opencv-python
 matplotlib
 Pillow
 ipywidgets
