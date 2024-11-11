@@ -15,11 +15,11 @@ def dice_coef(y_true, y_pred, smooth=1e-6):
     intersection = tf.reduce_sum(y_true * y_pred)
     return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
     
-# Load your trained U-Net model
-model = load_model(
-    '/content/drive/MyDrive/27_Oct_2024_Dataset_Creation/StratifiedDataset/newfiles_11Nov/unet-non-aug.keras',
-    custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef}
-)
+model_path = 'unet-non-aug.keras'
+if os.path.exists(model_path):
+    model = tf.keras.models.load_model(model_path)
+else:
+    print(f"Model file {model_path} not found!")
 
 def preprocess_image(image):
     # Resize to the expected input size (512, 512)
