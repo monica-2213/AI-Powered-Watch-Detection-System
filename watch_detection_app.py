@@ -1,6 +1,6 @@
 import streamlit as st
 import numpy as np
-import cv2
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 from PIL import Image
 import io
@@ -11,12 +11,12 @@ def load_model_from_local():
     model = load_model('unet-non-aug.keras', custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef})
     return model
 
-# Preprocess the uploaded image
+# Preprocess the uploaded image using PIL (instead of cv2)
 def preprocess_image(image):
     # Resize to the expected input size (512, 512)
-    image = cv2.resize(image, (512, 512))  # Note: (width, height) format
-    # Normalize the image
-    image = image / 255.0  # Scale pixel values to [0, 1]
+    image = image.resize((512, 512))  # PIL handles resizing (width, height)
+    # Convert the image to a NumPy array and normalize
+    image = np.array(image) / 255.0  # Scale pixel values to [0, 1]
     # Expand dimensions to match model input shape
     image = np.expand_dims(image, axis=0)  # Add batch dimension
     return image
@@ -28,17 +28,18 @@ def predict_mask(model, input_image):
 
 # Display segmented output
 def display_output(original_image, binary_mask_resized, predicted_mask):
-    # Create an image with the segmented area in color and the rest in grayscale
-    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    grayscale_background = cv2.cvtColor(grayscale_image, cv2.COLOR_GRAY2BGR)
+    # Convert original image to grayscale for background
+    grayscale_image = original_image.convert("L")  # Convert to grayscale using PIL
+    grayscale_background = np.array(grayscale_image.convert("RGB"))  # Convert grayscale to RGB
     
-    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, original_image, grayscale_background)
+    # Create the segmented image by combining the color segments and grayscale background
+    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, np.array(original_image), grayscale_background)
     
     # Plot the results
     fig, axes = plt.subplots(1, 4, figsize=(20, 8))
 
     # Original image
-    axes[0].imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+    axes[0].imshow(np.array(original_image))
     axes[0].set_title('Original Image')
     axes[0].axis('off')
 
@@ -54,7 +55,7 @@ def display_output(original_image, binary_mask_resized, predicted_mask):
     axes[2].axis('off')
 
     # Segmented area in color with grayscale background
-    axes[3].imshow(cv2.cvtColor(color_segmented_image, cv2.COLOR_BGR2RGB))
+    axes[3].imshow(color_segmented_image)
     axes[3].set_title('Segmented Area (Watch) in Color')
     axes[3].axis('off')
 
@@ -91,9 +92,8 @@ uploaded_file = st.sidebar.file_uploader("Choose an image...", type=["jpg", "jpe
 model = load_model_from_local()
 
 if uploaded_file is not None:
-    # Convert the uploaded image to a NumPy array
+    # Convert the uploaded image to a PIL image
     image = Image.open(uploaded_file)
-    image = np.array(image)
 
     # Preprocess the image
     input_image = preprocess_image(image)
@@ -106,8 +106,8 @@ if uploaded_file is not None:
     threshold = 0.1  # Adjust threshold as needed
     binary_mask = (predicted_mask > threshold).astype(np.uint8)
 
-    # Resize the mask to match the original image
-    binary_mask_resized = cv2.resize(binary_mask, (image.shape[1], image.shape[0]))
+    # Resize the mask to match the original image size
+    binary_mask_resized = np.array(Image.fromarray(binary_mask).resize(image.size))
 
     # Display the results
     display_output(image, binary_mask_resized, predicted_mask)
