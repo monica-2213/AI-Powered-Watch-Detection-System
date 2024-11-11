@@ -18,16 +18,29 @@ def download_model():
 
     # Download the model if it is not already present
     if not os.path.exists(model_path):
+        st.write(f"Downloading model from: {url}")
         gdown.download(url, model_path, quiet=False)
+    else:
+        st.write(f"Model already exists at: {model_path}")
+    
+    # Check if file exists after download
+    if os.path.exists(model_path):
+        st.write(f"Model successfully downloaded to {model_path}")
+    else:
+        st.write("Model download failed.")
 
     return model_path
 
 # Load the pre-trained U-Net model
 def load_model():
     model_path = download_model()
-    model = tf.keras.models.load_model(model_path)
-    return model
-
+    
+    if os.path.exists(model_path):
+        model = tf.keras.models.load_model(model_path)
+        return model
+    else:
+        raise ValueError(f"Model file not found at {model_path}")
+    
 def preprocess_image(image):
     """
     Preprocess the uploaded image:
