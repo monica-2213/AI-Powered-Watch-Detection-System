@@ -79,7 +79,7 @@ def main():
     st.write("Upload an image to detect and segment the watch:")
 
     # Upload file widget
-    uploaded_file = st.file_uploader("Choose an image...", type="jpg, jpeg, png")
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
         # Load the model
