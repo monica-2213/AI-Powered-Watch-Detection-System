@@ -5,4 +5,3 @@ pillow
 streamlit
 numpy
 matplotlib
-os
