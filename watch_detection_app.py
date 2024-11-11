@@ -2,7 +2,7 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image, ImageOps
-import cv2
+#import cv2
 import matplotlib.pyplot as plt
 
 # Load the pre-trained U-Net model from Google Drive (ensure the path is correct)
@@ -23,27 +23,25 @@ def preprocess_image(image):
     return image_array
 
 def segment_image(image):
-    """
-    Segments the image using the pre-trained U-Net model:
-    - Preprocess the image
-    - Predict the mask (binary segmentation)
-    - Apply mask to colorize the watch area and grayscale the background
-    """
+    # Preprocess the image
     preprocessed_image = preprocess_image(image)
-    prediction = model.predict(preprocessed_image)  # Make prediction with the model
-    prediction = np.squeeze(prediction, axis=0)  # Remove batch dimension
     
-    # Create binary mask from prediction (thresholding at 0.5)
-    mask = prediction > 0.5
+    # Make prediction with the model
+    prediction = model.predict(preprocessed_image)
+    
+    # Squeeze the batch dimension
+    prediction = np.squeeze(prediction, axis=0)
+    
+    # Create the output image: color watch, grayscale background
+    mask = prediction > 0.5  # Assuming binary segmentation
     mask = np.expand_dims(mask, axis=-1)  # Add channel dimension for blending
     
-    # Convert the input image to grayscale for background
-    image_array = np.array(image)
-    gray_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
-    gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2RGB)  # Convert to 3-channel grayscale
+    # Create grayscale image without using OpenCV
+    gray_image = np.array(image.convert('L'))  # Convert to grayscale
+    gray_image = np.stack([gray_image] * 3, axis=-1)  # Make it 3 channels for compatibility
     
-    # Apply the mask: retain color on the watch and grayscale the background
-    result = np.where(mask == 1, image_array, gray_image)
+    # Apply the mask to retain the color on the watch and grayscale on the background
+    result = np.where(mask == 1, np.array(image), gray_image)
     
     return result
 
