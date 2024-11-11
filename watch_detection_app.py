@@ -3,7 +3,18 @@ import streamlit as st
 from tensorflow.keras.models import load_model
 from PIL import Image
 import io
+import tensorflow as tf
 
+# Define Dice Loss
+def dice_loss(y_true, y_pred, smooth=1e-6):
+    intersection = tf.reduce_sum(y_true * y_pred)
+    return 1 - (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
+
+# Define Dice Coefficient
+def dice_coef(y_true, y_pred, smooth=1e-6):
+    intersection = tf.reduce_sum(y_true * y_pred)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
+    
 # Load your trained U-Net model
 model = load_model(
     '/content/drive/MyDrive/27_Oct_2024_Dataset_Creation/StratifiedDataset/newfiles_11Nov/unet-non-aug.keras',
