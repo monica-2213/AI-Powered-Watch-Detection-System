@@ -1,93 +1,117 @@
-import tensorflow as tf
-import zipfile
-import os
-import gdown
 import streamlit as st
 import numpy as np
+import cv2
+from tensorflow.keras.models import load_model
 from PIL import Image
+import io
+import matplotlib.pyplot as plt
 
-def download_and_extract_model():
-    model_id = '1EAqFoUexroNtxyrxNXB_eoWYPTRPJw8c'
-    url = f'https://drive.google.com/uc?id={model_id}'
-    
-    zip_path = 'unet-non-aug.zip'
-    model_path = 'unet-non-aug.keras'
-    
-    if not os.path.exists(zip_path):
-        st.write("Downloading model zip file...")
-        gdown.download(url, zip_path, quiet=False)
-    
-    if not os.path.exists(model_path):
-        st.write("Extracting model file...")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall()
-            st.write(f"Model extracted.")
-            st.write("Extracted files:", os.listdir())  # List the extracted files
-    
-    # Verify the model file exists after extraction
-    model_path = os.path.abspath(model_path)  # Use absolute path for better accuracy
-    st.write(f"Model file absolute path: {model_path}")
-    
-    if not os.path.exists(model_path):
-        st.error(f"Model extraction failed! Could not find '{model_path}' after extraction.")
-        return None
-    
-    st.write(f"Model file found at: {model_path}")
-    return model_path
+# Load the U-Net model locally
+def load_model_from_local():
+    model = load_model('unet-non-aug.keras', custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef})
+    return model
 
-def load_model():
-    model_path = download_and_extract_model()
-    if model_path is None:
-        return None
-    
-    try:
-        # Try loading the model with TensorFlow
-        model = tf.keras.models.load_model(model_path)
-        st.write("Model loaded successfully!")
-        return model
-    except Exception as e:
-        st.error(f"Error loading the model: {e}")
-        return None
-
+# Preprocess the uploaded image
 def preprocess_image(image):
-    image = image.resize((512, 512))  # Resize to match model input size
-    image_array = np.array(image)
-    image_array = image_array / 255.0  # Normalize the image
-    image_array = np.expand_dims(image_array, axis=0)  # Add batch dimension
-    return image_array
+    # Resize to the expected input size (512, 512)
+    image = cv2.resize(image, (512, 512))  # Note: (width, height) format
+    # Normalize the image
+    image = image / 255.0  # Scale pixel values to [0, 1]
+    # Expand dimensions to match model input shape
+    image = np.expand_dims(image, axis=0)  # Add batch dimension
+    return image
 
-def segment_image(image, model):
-    preprocessed_image = preprocess_image(image)
-    prediction = model.predict(preprocessed_image)
-    prediction = np.squeeze(prediction, axis=0)  # Remove the batch dimension
-    mask = prediction > 0.5  # Threshold the prediction to create a binary mask
-    mask = np.expand_dims(mask, axis=-1)  # Ensure mask has same dimension as image
+# Predict the mask using the model
+def predict_mask(model, input_image):
+    predicted_mask = model.predict(input_image)
+    return predicted_mask
+
+# Display segmented output
+def display_output(original_image, binary_mask_resized, predicted_mask):
+    # Create an image with the segmented area in color and the rest in grayscale
+    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
+    grayscale_background = cv2.cvtColor(grayscale_image, cv2.COLOR_GRAY2BGR)
     
-    gray_image = np.array(image.convert('L'))  # Convert to grayscale
-    gray_image = np.stack([gray_image] * 3, axis=-1)  # Convert to 3 channels
+    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, original_image, grayscale_background)
     
-    result = np.where(mask == 1, np.array(image), gray_image)  # Apply mask to image
-    
-    return result
+    # Plot the results
+    fig, axes = plt.subplots(1, 4, figsize=(20, 8))
 
-def show_image(image):
-    st.image(image, channels="RGB", use_column_width=True)
+    # Original image
+    axes[0].imshow(cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB))
+    axes[0].set_title('Original Image')
+    axes[0].axis('off')
 
-def main():
-    st.title("Watch Detection App")
-    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
-    
-    if uploaded_file is not None:
-        model = load_model()
-        if model is None:
-            st.error("Failed to load the model. Please check the model file.")
-            return
+    # Predicted segmentation mask
+    axes[1].imshow(binary_mask_resized, cmap='gray')
+    axes[1].set_title('Predicted Segmentation Mask')
+    axes[1].axis('off')
 
-        image = Image.open(uploaded_file)
-        segmented_image = segment_image(image, model)
+    # Predicted probability map (optional)
+    predicted_mask_scaled = (predicted_mask[0] * 255).astype(np.uint8)
+    axes[2].imshow(predicted_mask_scaled, cmap='jet')
+    axes[2].set_title('Predicted Probability Map')
+    axes[2].axis('off')
 
-        st.write("Segmented Image:")
-        show_image(segmented_image)
+    # Segmented area in color with grayscale background
+    axes[3].imshow(cv2.cvtColor(color_segmented_image, cv2.COLOR_BGR2RGB))
+    axes[3].set_title('Segmented Area (Watch) in Color')
+    axes[3].axis('off')
 
-if __name__ == "__main__":
-    main()
+    # Show plot in Streamlit
+    st.pyplot(fig)
+
+# Streamlit UI setup
+st.title("Watch Segmentation with U-Net")
+
+st.markdown("""
+    <style>
+        .main {
+            background-color: #F0F8FF;
+            color: #1E90FF;
+            font-family: Arial, sans-serif;
+        }
+        .upload-btn {
+            background-color: #32CD32;
+            color: white;
+            font-size: 16px;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .upload-btn:hover {
+            background-color: #228B22;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.sidebar.header("Upload your image:")
+uploaded_file = st.sidebar.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+# Load the model locally
+model = load_model_from_local()
+
+if uploaded_file is not None:
+    # Convert the uploaded image to a NumPy array
+    image = Image.open(uploaded_file)
+    image = np.array(image)
+
+    # Preprocess the image
+    input_image = preprocess_image(image)
+
+    # Make predictions
+    predicted_mask = predict_mask(model, input_image)
+
+    # Post-process the prediction
+    predicted_mask = predicted_mask[0].squeeze()  # Remove batch and channel dimensions
+    threshold = 0.1  # Adjust threshold as needed
+    binary_mask = (predicted_mask > threshold).astype(np.uint8)
+
+    # Resize the mask to match the original image
+    binary_mask_resized = cv2.resize(binary_mask, (image.shape[1], image.shape[0]))
+
+    # Display the results
+    display_output(image, binary_mask_resized, predicted_mask)
+
+    st.success("Segmentation completed successfully!")
+else:
+    st.info("Please upload an image to begin segmentation.")
