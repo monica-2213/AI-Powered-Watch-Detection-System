@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 # Download the model from Google Drive
 def download_model():
-    # Google Drive file ID
-    model_id = '1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4'
+    # Google Drive file ID (updated based on the new link)
+    model_id = '1Q97oFaLn8aC8aKJjkZQ-WIlJiLjKUQO1'
     # URL to download the model
     url = f'https://drive.google.com/uc?id={model_id}'
     
