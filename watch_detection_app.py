@@ -4,7 +4,12 @@ from PIL import Image, ImageOps
 import numpy as np
 
 # Load the pre-trained model
-model = tf.keras.models.load_model('unet-non-aug.keras')
+import os
+model_path = 'unet-non-aug.keras'
+if os.path.exists(model_path):
+    model = tf.keras.models.load_model(model_path)
+else:
+    print(f"Model file {model_path} not found!")
 
 def process_image(image):
     # Convert the image to RGB
