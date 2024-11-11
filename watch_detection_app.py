@@ -1,5 +1,5 @@
 import os
-import requests
+import gdown
 import streamlit as st
 import numpy as np
 import cv2
@@ -9,25 +9,13 @@ from tensorflow.keras.models import load_model
 
 # Function to download a model from Google Drive
 def download_model_from_gdrive(file_id, destination_path):
-    # Construct the URL to download the model from Google Drive
     url = f'https://drive.google.com/uc?id={file_id}'
-    
-    # Send a GET request to download the file
-    response = requests.get(url, stream=True)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Open the file in write-binary mode and save the content
-        with open(destination_path, 'wb') as f:
-            f.write(response.content)
-        print(f"Model downloaded successfully: {destination_path}")
-    else:
-        print(f"Failed to download the model: {response.status_code}")
+    gdown.download(url, destination_path, quiet=False)
 
 # Google Drive file ID for your model
 model_url = 'https://drive.google.com/uc?id=1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4'
 file_id = model_url.split('=')[-1]
-model_path = 'unet_model.keras'
+model_path = 'unet-non-aug.keras'
 
 # Download the model if not already present
 if not os.path.exists(model_path):
