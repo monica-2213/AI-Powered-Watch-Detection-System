@@ -1,117 +1,107 @@
 import streamlit as st
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 from tensorflow.keras.models import load_model
 from PIL import Image
-import os
-import gdown
 
-# Function to download the pre-trained model from Google Drive
-def download_model():
-    model_path = "https://drive.google.com/file/d/1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4/view?usp=sharing"
+# Function to download the model from a URL
+def download_model(url, model_path):
+    response = requests.get(url)
+    with open(model_path, 'wb') as f:
+        f.write(response.content)
+    st.success("Model downloaded successfully!")
+
+# URL of the pre-trained model (Replace this with your model's URL)
+model_url = 'https://drive.google.com/uc?id=1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4'  # Update this with your actual model URL
+model_path = 'unet-non-aug.keras'  # Path to save the downloaded model
+
+# Download the model if it doesn't exist locally
+if not os.path.exists(model_path):
+    download_model(model_url, model_path)
     
-    if not os.path.exists(model_path):
-        gdown.download(model_url, model_path, quiet=False)
-    
-    return model_path
+# Define dice loss and dice coefficient functions if required by the model
+# These functions should match the ones used in the training of the U-Net model
+smooth = 1e-15
+def dice_coef(y_true, y_pred):
+    y_true = tf.keras.layers.Flatten()(y_true)
+    y_pred = tf.keras.layers.Flatten()(y_pred)
+    intersection = tf.reduce_sum(y_true * y_pred)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
 
-# Load your pre-trained U-Net model
-model_path = download_model()
-model = load_model(model_path)
+def dice_loss(y_true, y_pred):
+    return 1.0 - dice_coef(y_true, y_pred)
 
-# Function to preprocess the uploaded image
+# Load the pre-trained U-Net model
+model = load_model(
+    model_path,
+    custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef}
+)
+
 def preprocess_image(image):
-    image = image.convert('RGB')
-    img_array = np.array(image)
-    img_resized = cv2.resize(img_array, (256, 256))  # Assuming your model accepts 256x256
-    img_resized = img_resized / 255.0  # Normalize the image
-    img_resized = np.expand_dims(img_resized, axis=0)  # Add batch dimension
-    return img_resized
+    # Resize to the expected input size (512, 512)
+    image = cv2.resize(image, (512, 512))  # Note: (width, height) format
+    # Normalize the image (if necessary)
+    image = image / 255.0  # Scale pixel values to [0, 1]
+    # Expand dimensions to match model input shape
+    image = np.expand_dims(image, axis=0)  # Add batch dimension
+    return image
 
-# Function to segment the image
-def segment_image(image):
-    preprocessed_image = preprocess_image(image)
-    prediction = model.predict(preprocessed_image)  # Get prediction from model
-    prediction = (prediction > 0.5).astype(np.uint8)  # Thresholding
-    
-    mask = prediction[0, :, :, 0]  # Assuming single-channel output (for binary mask)
-    original_size = image.size
-    mask_resized = cv2.resize(mask, (original_size[0], original_size[1]), interpolation=cv2.INTER_NEAREST)
+def segment_image(uploaded_image):
+    # Read and process the uploaded image
+    original_image = np.array(uploaded_image)
 
-    return mask_resized
+    # Preprocess the image
+    input_image = preprocess_image(original_image)
 
-# Function to blend the results (colorized watch area with grayscale background)
-def blend_image(image, mask):
-    img_array = np.array(image)
-    gray_image = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-    gray_image = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2RGB)
-    
-    color_watch = np.zeros_like(img_array)
-    color_watch[:, :, :] = img_array[:, :, :]
-    
-    color_watch[mask == 1] = img_array[mask == 1]
-    gray_image[mask == 1] = color_watch[mask == 1]
-    
-    return gray_image
+    # Make predictions
+    predicted_mask = model.predict(input_image)
 
-# Streamlit UI setup
-st.set_page_config(page_title="AI-Powered Watch Detection", layout="centered")
+    # Handle binary segmentation
+    predicted_mask = predicted_mask[0].squeeze()  # Remove batch and channel dimensions
 
-# Custom CSS for better UI design
-st.markdown("""
-    <style>
-        body {
-            background-color: #f4f4f4;
-            font-family: 'Arial', sans-serif;
-        }
-        .title {
-            font-size: 2em;
-            font-weight: bold;
-            color: #4CAF50;
-            text-align: center;
-        }
-        .upload-section {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            margin-top: 30px;
-        }
-        .uploaded-image {
-            border-radius: 10px;
-            margin-top: 20px;
-        }
-        .output-title {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #4CAF50;
-            margin-top: 30px;
-        }
-    </style>
-""", unsafe_allow_html=True)
+    # Thresholding
+    threshold = 0.1  # Adjust threshold as needed
+    binary_mask = (predicted_mask > threshold).astype(np.uint8)
 
-# Title of the web app
-st.markdown('<div class="title">AI-Powered Watch Detection System</div>', unsafe_allow_html=True)
+    # Resize binary mask to match original image size if necessary
+    binary_mask_resized = cv2.resize(binary_mask, (original_image.shape[1], original_image.shape[0]))
 
-# Upload image section
-with st.container():
-    st.markdown('<div class="upload-section">', unsafe_allow_html=True)
-    uploaded_image = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
-    if uploaded_image is not None:
-        image = Image.open(uploaded_image)
-        st.image(image, caption='Uploaded Image', use_column_width=True, class_="uploaded-image")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Create an image with the segmented area in color and the rest in grayscale
+    grayscale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
+    grayscale_background = cv2.cvtColor(grayscale_image, cv2.COLOR_GRAY2BGR)
 
-if uploaded_image is not None:
-    # Segment the image
-    mask = segment_image(image)
+    # Combine the color-segmented area with the grayscale background
+    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, original_image, grayscale_background)
 
-    # Blend the segmented output
-    blended_image = blend_image(image, mask)
+    return original_image, binary_mask_resized, color_segmented_image, predicted_mask
 
-    # Convert blended image to PIL for display
-    blended_image_pil = Image.fromarray(blended_image)
+# Streamlit UI
+st.title("AI Powered Watch Detection System")
+st.write("Upload an image to detect and segment the watch.")
 
-    # Output the segmented result
-    st.markdown('<div class="output-title">Segmented Output</div>', unsafe_allow_html=True)
-    st.image(blended_image_pil, caption='Segmented Watch', use_column_width=True)
+# File uploader
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+
+if uploaded_file is not None:
+    # Convert the uploaded file to a format suitable for OpenCV
+    image = Image.open(uploaded_file)
+    original_image = np.array(image)
+
+    # Display the original image
+    st.image(original_image, caption="Uploaded Image", use_column_width=True)
+
+    # Segment the image using the model
+    original_image, binary_mask, color_segmented_image, predicted_mask = segment_image(original_image)
+
+    # Display the results
+    st.subheader("Predicted Segmentation Mask")
+    st.image(binary_mask, caption="Predicted Mask", use_column_width=True, clamp=True, channels="GRAY")
+
+    st.subheader("Segmented Area in Color with Grayscale Background")
+    st.image(color_segmented_image, caption="Segmented Watch", use_column_width=True)
+
+    # Optionally display the predicted probability map
+    predicted_mask_scaled = (predicted_mask * 255).astype(np.uint8)
+    st.subheader("Predicted Probability Map")
+    st.image(predicted_mask_scaled, caption="Predicted Probability", use_column_width=True, clamp=True, channels="GRAY")
