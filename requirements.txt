@@ -3,4 +3,3 @@ tensorflow
 matplotlib
 Pillow
 ipywidgets
-cv2
