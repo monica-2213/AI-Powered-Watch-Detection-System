@@ -8,8 +8,7 @@ import gdown
 
 # Function to download the pre-trained model from Google Drive
 def download_model():
-    model_url = "https://drive.google.com/file/d/1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4/view?usp=sharing"  # Replace with your Google Drive model link
-    model_path = "unet-non-aug.keras"
+    model_path = "https://drive.google.com/file/d/1-3SRZig9bvYvUYQmIVjO54l2oLlafpG4/view?usp=sharing"
     
     if not os.path.exists(model_path):
         gdown.download(model_url, model_path, quiet=False)
