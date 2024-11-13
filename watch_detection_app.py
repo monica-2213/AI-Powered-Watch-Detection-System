@@ -43,6 +43,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# Define Dice coefficient and Dice loss
+smooth = 1e-15
+
+def dice_coef(y_true, y_pred):
+    y_true = tf.keras.layers.Flatten()(y_true)
+    y_pred = tf.keras.layers.Flatten()(y_pred)
+    intersection = tf.reduce_sum(y_true * y_pred)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
+
+def dice_loss(y_true, y_pred):
+    return 1.0 - dice_coef(y_true, y_pred)
+
 # Define model path and GitHub model URL
 model_path = "/tmp/unet-non-aug.keras"
 github_model_url = "https://github.com/monica-2213/AI-Powered-Watch-Detection-System/raw/main/unet-non-aug.keras"
@@ -55,9 +67,9 @@ if not os.path.exists(model_path):
         f.write(response.content)
     st.success("Model downloaded!")
 
-# Load the UNet model and handle any compatibility issues
+# Load the UNet model with custom objects
 try:
-    model = tf.keras.models.load_model(model_path)
+    model = tf.keras.models.load_model(model_path, custom_objects={'dice_loss': dice_loss, 'dice_coef': dice_coef})
     st.success("UNet model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading model: {e}")
@@ -76,7 +88,7 @@ if uploaded_file is not None:
     st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
 
     # Prepare the image for the UNet model
-    img_resized = image.resize((256, 256))  # Resize to model input size
+    img_resized = image.resize((512, 512))  # Resize to model input size used during training
     img_array = img_to_array(img_resized) / 255.0  # Normalize to [0,1]
     img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
@@ -87,7 +99,7 @@ if uploaded_file is not None:
 
     # Convert segmentation mask to a binary image and overlay it on the original
     mask = (segmented_image > 0.5).astype(np.uint8)  # Binarize mask
-    overlay = np.array(image.resize((256, 256)))
+    overlay = np.array(image.resize((512, 512)))
     overlay[mask == 0] = [0, 0, 0]  # Make background black in the overlay
 
     # Display segmentation results
