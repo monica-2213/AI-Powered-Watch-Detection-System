@@ -4,8 +4,7 @@ import requests
 from PIL import Image
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.saving import register_keras_serializable
+from tensorflow.keras.utils import register_keras_serializable  # Correct import
 
 # Set Streamlit page configuration for a better UI
 st.set_page_config(page_title="Watch Segmentation with UNet", page_icon="⌚", layout="centered")
@@ -45,7 +44,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Register the custom dice_loss function as a serializable function
-@saving.register_keras_serializable()
+@register_keras_serializable()  # Corrected decorator usage
 def dice_coef(y_true, y_pred):
     smooth = 1e-15
     y_true = tf.keras.layers.Flatten()(y_true)
@@ -53,7 +52,7 @@ def dice_coef(y_true, y_pred):
     intersection = tf.reduce_sum(y_true * y_pred)
     return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
 
-@saving.register_keras_serializable()
+@register_keras_serializable()  # Corrected decorator usage
 def dice_loss(y_true, y_pred):
     return 1.0 - dice_coef(y_true, y_pred)
 
