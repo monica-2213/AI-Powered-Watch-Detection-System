@@ -46,7 +46,7 @@ st.markdown("""
 
 # Check if the model is available and download it if not
 model_path = "/tmp/unet-non-aug.keras"
-github_model_url = "https://github.com/monica-2213/Flowers_Detection_with_YOLOv8/raw/main/unet-non-aug.keras"
+github_model_url = "https://github.com/monica-2213/AI-Powered-Watch-Detection-System/raw/main/unet-non-aug.keras"
 
 # If the model doesn't exist, download it
 if not os.path.exists(model_path):
