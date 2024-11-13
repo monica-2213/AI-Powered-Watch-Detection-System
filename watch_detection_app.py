@@ -1,91 +1,102 @@
-import numpy as np
 import streamlit as st
-from tensorflow.keras.models import load_model
+import os
+import requests
 from PIL import Image
-import io
-import tensorflow as tf
+import numpy as np
+import cv2
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import img_to_array
 
-# Define Dice Loss
-def dice_loss(y_true, y_pred, smooth=1e-6):
-    intersection = tf.reduce_sum(y_true * y_pred)
-    return 1 - (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
+# Set Streamlit page configuration for a better UI
+st.set_page_config(page_title="Watch Segmentation with UNet", page_icon="⌚", layout="centered")
 
-# Define Dice Coefficient
-def dice_coef(y_true, y_pred, smooth=1e-6):
-    intersection = tf.reduce_sum(y_true * y_pred)
-    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
-    
-model_path = 'unet-non-aug.keras'
-if os.path.exists(model_path):
-    model = tf.keras.models.load_model(model_path)
-else:
-    print(f"Model file {model_path} not found!")
+# Custom CSS for the app's appearance
+st.markdown("""
+    <style>
+        .title {
+            color: #4a90e2;
+            font-size: 36px;
+            font-family: 'Roboto', sans-serif;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .description {
+            color: #444;
+            font-size: 18px;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .stButton button {
+            background-color: #4a90e2;
+            color: white;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .stFileUploader label {
+            background-color: #4a90e2;
+            color: white;
+            border-radius: 5px;
+            padding: 12px 20px;
+            font-size: 16px;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-def preprocess_image(image):
-    # Resize to the expected input size (512, 512)
-    image = image.resize((512, 512))  # Resize using Pillow (width, height)
-    # Normalize the image (if necessary)
-    image = np.array(image) / 255.0  # Convert to numpy array and scale pixel values to [0, 1]
-    # Expand dimensions to match model input shape
-    image = np.expand_dims(image, axis=0)  # Add batch dimension
-    return image
+# Check if the model is available and download it if not
+model_path = "/tmp/unet-non-aug.keras"
+github_model_url = "https://github.com/monica-2213/Flowers_Detection_with_YOLOv8/raw/main/unet-non-aug.keras"
 
-def segment_image(image):
-    # Preprocess the image
-    input_image = preprocess_image(image)
+# If the model doesn't exist, download it
+if not os.path.exists(model_path):
+    st.write("Downloading UNet model...")
+    response = requests.get(github_model_url)
+    with open(model_path, 'wb') as f:
+        f.write(response.content)
+    st.success("Model downloaded!")
 
-    # Make predictions
-    predicted_mask = model.predict(input_image)
+# Load the UNet model
+model = load_model(model_path)
+st.success("UNet model loaded!")
 
-    # Debugging outputs
-    print("Input Image Shape:", input_image.shape)
-    print("Predicted Mask Shape:", predicted_mask.shape)
-    print("Predicted Mask Unique Values:", np.unique(predicted_mask))
+# Streamlit interface
+st.markdown('<div class="title">⌚ Watch Segmentation with UNet ⌚</div>', unsafe_allow_html=True)
+st.markdown('<div class="description">Upload an image of a watch, and the UNet model will segment it for you.</div>', unsafe_allow_html=True)
 
-    # Handle binary segmentation
-    predicted_mask = predicted_mask[0].squeeze()  # Remove batch and channel dimensions
+# File uploader
+uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
 
-    # Thresholding
-    threshold = 0.1  # Adjust threshold as needed
-    binary_mask = (predicted_mask > threshold).astype(np.uint8)
-
-    return binary_mask, predicted_mask
-
-def display_results(original_image, binary_mask, predicted_mask):
-    # Resize binary mask to match original image size if necessary
-    binary_mask_resized = binary_mask  # Already has the same shape
-
-    # Convert the original image to grayscale using Pillow
-    grayscale_image = original_image.convert("L")
-    grayscale_image = np.array(grayscale_image)
-
-    # Create a grayscale background
-    grayscale_background = np.stack([grayscale_image] * 3, axis=-1)
-
-    # Combine the color-segmented area with the grayscale background
-    color_segmented_image = np.where(binary_mask_resized[..., None] == 1, np.array(original_image), grayscale_background)
-
-    # Display the results using Streamlit
-    st.image(original_image, caption="Original Image", use_column_width=True)
-
-    st.image(binary_mask_resized, caption="Predicted Segmentation Mask", use_column_width=True)
-
-    predicted_mask_scaled = (predicted_mask * 255).astype(np.uint8)
-    st.image(predicted_mask_scaled, caption="Predicted Probability Map", use_column_width=True, channels="BGR")
-
-    st.image(color_segmented_image, caption="Segmented Area in Color with Grayscale Background", use_column_width=True)
-
-# Streamlit file uploader
-st.title("Watch Image Segmentation")
-
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
-
-if uploaded_file:
-    # Open the uploaded image using Pillow
+if uploaded_file is not None:
+    # Open the image using PIL
     image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
 
-    # Segment the image
-    binary_mask, predicted_mask = segment_image(image)
+    # Prepare the image for the UNet model
+    img_resized = image.resize((256, 256))  # Resize to model input size
+    img_array = img_to_array(img_resized) / 255.0  # Normalize to [0,1]
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
-    # Display the results
-    display_results(image, binary_mask, predicted_mask)
+    # Run inference using UNet for segmentation
+    st.write("Running segmentation... Please wait.")
+    prediction = model.predict(img_array)
+    segmented_image = np.squeeze(prediction)  # Remove batch dimension
+
+    # Convert segmentation mask to a binary image and overlay it on the original
+    mask = (segmented_image > 0.5).astype(np.uint8)  # Binarize mask
+    overlay = np.array(image.resize((256, 256)))
+    overlay[mask == 0] = [0, 0, 0]  # Make background black in the overlay
+
+    # Display segmentation results
+    st.image(overlay, caption="Segmented Watch", use_column_width=True)
+
+    # Save and provide a download button for the segmented image
+    output_image_path = "/tmp/segmented_watch.png"
+    Image.fromarray(overlay).save(output_image_path)
+
+    st.download_button(
+        "Download Segmented Image",
+        data=open(output_image_path, "rb"),
+        file_name="segmented_watch.png",
+        help="Click to download the segmented watch image."
+    )
