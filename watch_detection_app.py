@@ -5,6 +5,8 @@ import requests
 from PIL import Image
 import numpy as np
 import streamlit as st
+from tensorflow.keras.preprocessing.image import img_to_array
+
 
 # Register custom loss function
 @register_keras_serializable()
