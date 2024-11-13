@@ -3,8 +3,7 @@ import os
 import requests
 from PIL import Image
 import numpy as np
-import cv2
-from tensorflow.keras.models import load_model
+import tensorflow as tf
 from tensorflow.keras.preprocessing.image import img_to_array
 
 # Set Streamlit page configuration for a better UI
@@ -44,21 +43,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Check if the model is available and download it if not
+# Define model path and GitHub model URL
 model_path = "/tmp/unet-non-aug.keras"
 github_model_url = "https://github.com/monica-2213/AI-Powered-Watch-Detection-System/raw/main/unet-non-aug.keras"
 
-# If the model doesn't exist, download it
+# Download the model if it doesn't exist
 if not os.path.exists(model_path):
-    st.write("Downloading UNet model...")
+    st.write("Downloading UNet model... Please wait.")
     response = requests.get(github_model_url)
     with open(model_path, 'wb') as f:
         f.write(response.content)
     st.success("Model downloaded!")
 
-# Load the UNet model
-model = load_model(model_path)
-st.success("UNet model loaded!")
+# Load the UNet model and handle any compatibility issues
+try:
+    model = tf.keras.models.load_model(model_path)
+    st.success("UNet model loaded successfully!")
+except Exception as e:
+    st.error(f"Error loading model: {e}")
+    st.stop()  # Stop execution if the model can't be loaded
 
 # Streamlit interface
 st.markdown('<div class="title">⌚ Watch Segmentation with UNet ⌚</div>', unsafe_allow_html=True)
