@@ -1,10 +1,23 @@
-import streamlit as st
+from tensorflow.keras.utils import register_keras_serializable
+import tensorflow as tf
 import os
 import requests
 from PIL import Image
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.utils import register_keras_serializable  # Correct import
+import streamlit as st
+
+# Register custom loss function
+@register_keras_serializable()
+def dice_coef(y_true, y_pred):
+    smooth = 1e-15
+    y_true = tf.keras.layers.Flatten()(y_true)
+    y_pred = tf.keras.layers.Flatten()(y_pred)
+    intersection = tf.reduce_sum(y_true * y_pred)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
+
+@register_keras_serializable()
+def dice_loss(y_true, y_pred):
+    return 1.0 - dice_coef(y_true, y_pred)
 
 # Set Streamlit page configuration for a better UI
 st.set_page_config(page_title="Watch Segmentation with UNet", page_icon="⌚", layout="centered")
@@ -42,19 +55,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-# Register the custom dice_loss function as a serializable function
-@register_keras_serializable()  # Corrected decorator usage
-def dice_coef(y_true, y_pred):
-    smooth = 1e-15
-    y_true = tf.keras.layers.Flatten()(y_true)
-    y_pred = tf.keras.layers.Flatten()(y_pred)
-    intersection = tf.reduce_sum(y_true * y_pred)
-    return (2. * intersection + smooth) / (tf.reduce_sum(y_true) + tf.reduce_sum(y_pred) + smooth)
-
-@register_keras_serializable()  # Corrected decorator usage
-def dice_loss(y_true, y_pred):
-    return 1.0 - dice_coef(y_true, y_pred)
 
 # Define model path and GitHub model URL
 model_path = "/tmp/unet-non-aug.keras"
