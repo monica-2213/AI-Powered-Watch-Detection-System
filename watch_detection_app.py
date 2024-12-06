@@ -63,17 +63,19 @@ st.markdown("""
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Watch Segmentation", "About"])
 
-# Define model path and GitHub model URL
+# Define model path and Google Drive file ID
 model_path = "/tmp/unet.keras"
-github_model_url = "https://example.com/unet.keras"  # Replace with your actual URL or file path
+google_drive_file_id = "1YWxs3feor6QgdaJwRERY2yqcK4_TGCVK"  # Replace with your actual file ID
 
 # Download the model if it doesn't exist
 if not os.path.exists(model_path):
     st.write("Downloading UNet model... Please wait.")
-    response = requests.get(github_model_url)
-    with open(model_path, 'wb') as f:
-        f.write(response.content)
-    st.success("Model downloaded!")
+    try:
+        gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
+        st.success("Model downloaded successfully!")
+    except Exception as e:
+        st.error(f"Failed to download the model: {e}")
+        st.stop()
 
 # Load the UNet model with custom objects
 try:
@@ -81,7 +83,7 @@ try:
     st.success("UNet model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading model: {e}")
-    st.stop()  # Stop execution if the model can't be loaded
+    st.stop()
 
 # Page: Watch Segmentation
 if page == "Watch Segmentation":
