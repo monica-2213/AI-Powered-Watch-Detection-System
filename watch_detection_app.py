@@ -12,14 +12,31 @@ model_path = "unet.keras"  # Path where the model will be saved
 
 # Function to download file from Google Drive
 def download_from_google_drive(file_id, destination):
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
-    with requests.get(url, stream=True) as response:
-        if response.status_code == 200:
-            with open(destination, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        else:
-            raise Exception(f"Failed to download file from Google Drive. Status code: {response.status_code}")
+    base_url = "https://drive.google.com/uc?export=download"
+    session = requests.Session()
+    response = session.get(base_url, params={"id": file_id}, stream=True)
+    token = get_confirm_token(response)
+
+    if token:
+        params = {"id": file_id, "confirm": token}
+        response = session.get(base_url, params=params, stream=True)
+
+    save_response_content(response, destination)
+
+
+def get_confirm_token(response):
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):
+            return value
+    return None
+
+
+def save_response_content(response, destination):
+    with open(destination, "wb") as f:
+        for chunk in response.iter_content(chunk_size=32768):
+            if chunk:  # Filter out keep-alive chunks
+                f.write(chunk)
+
 
 # Download the model if it doesn't already exist
 if not os.path.exists(model_path):
