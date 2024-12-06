@@ -7,21 +7,27 @@ import streamlit as st
 st.set_page_config(page_title="Watch Segmentation with UNet", page_icon="⌚", layout="wide")
 
 # Define the model download link and local path
-model_download_url = "https://drive.google.com/uc?export=download&id=1YWxs3feor6QgdaJwRERY2yqcK4_TGCVK"
+model_id = "1YWxs3feor6QgdaJwRERY2yqcK4_TGCVK"  # Google Drive file ID
 model_path = "unet.keras"  # Path where the model will be saved
+
+# Function to download file from Google Drive
+def download_from_google_drive(file_id, destination):
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    with requests.get(url, stream=True) as response:
+        if response.status_code == 200:
+            with open(destination, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        else:
+            raise Exception(f"Failed to download file from Google Drive. Status code: {response.status_code}")
 
 # Download the model if it doesn't already exist
 if not os.path.exists(model_path):
     st.write("Downloading UNet model... Please wait.")
     try:
-        # Download the model file
-        response = requests.get(model_download_url, stream=True)
-        response.raise_for_status()  # Ensure the request was successful
-        with open(model_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        download_from_google_drive(model_id, model_path)
         st.success("Model downloaded successfully!")
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         st.error(f"Failed to download the model: {e}")
         st.stop()
 
