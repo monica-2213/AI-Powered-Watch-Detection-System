@@ -1,7 +1,7 @@
 from tensorflow.keras.utils import register_keras_serializable
 import tensorflow as tf
 import os
-import gdown
+import requests
 from PIL import Image
 import numpy as np
 import streamlit as st
@@ -22,10 +22,10 @@ def iou_coef(y_true, y_pred):
 def iou_loss(y_true, y_pred):
     return 1.0 - iou_coef(y_true, y_pred)
 
-# Set Streamlit page configuration for a better UI
+# Set Streamlit page configuration
 st.set_page_config(page_title="Watch Segmentation with UNet", page_icon="⌚", layout="wide")
 
-# Custom CSS for the app's appearance
+# Custom CSS for the app
 st.markdown("""
     <style>
         .title {
@@ -63,19 +63,17 @@ st.markdown("""
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Watch Segmentation", "About"])
 
-# Define model path and Google Drive file ID
+# Define model path and GitHub model URL
 model_path = "/tmp/unet.keras"
-google_drive_file_id = "1YWxs3feor6QgdaJwRERY2yqcK4_TGCVK"  # Replace with your actual file ID
+github_model_url = "https://example.com/unet.keras"  # Replace with your actual URL or file path
 
 # Download the model if it doesn't exist
 if not os.path.exists(model_path):
     st.write("Downloading UNet model... Please wait.")
-    try:
-        gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
-        st.success("Model downloaded successfully!")
-    except Exception as e:
-        st.error(f"Failed to download the model: {e}")
-        st.stop()
+    response = requests.get(github_model_url)
+    with open(model_path, 'wb') as f:
+        f.write(response.content)
+    st.success("Model downloaded!")
 
 # Load the UNet model with custom objects
 try:
@@ -83,7 +81,7 @@ try:
     st.success("UNet model loaded successfully!")
 except Exception as e:
     st.error(f"Error loading model: {e}")
-    st.stop()
+    st.stop()  # Stop execution if the model can't be loaded
 
 # Page: Watch Segmentation
 if page == "Watch Segmentation":
@@ -98,34 +96,45 @@ if page == "Watch Segmentation":
         image = Image.open(uploaded_file)
         st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
 
-        # Prepare the image for the UNet model
-        img_resized = image.resize((512, 512))  # Resize to model input size used during training
-        img_array = img_to_array(img_resized) / 255.0  # Normalize to [0,1]
-        img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+        # Check model input shape
+        model_input_shape = model.input_shape
+        st.write(f"Model expects input shape: {model_input_shape}")
 
-        # Run inference using UNet for segmentation
-        st.write("Running segmentation... Please wait.")
-        prediction = model.predict(img_array)
-        segmented_image = np.squeeze(prediction)  # Remove batch dimension
+        # Preprocess the uploaded image
+        try:
+            img_resized = image.resize((model_input_shape[1], model_input_shape[2]))  # Resize to model input size
+            img_rgb = img_resized.convert("RGB")  # Ensure 3 channels (RGB)
+            img_array = img_to_array(img_rgb) / 255.0  # Normalize to [0, 1]
+            img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
-        # Convert segmentation mask to a binary image and overlay it on the original
-        mask = (segmented_image > 0.5).astype(np.uint8)  # Binarize mask
-        overlay = np.array(image.resize((512, 512)))
-        overlay[mask == 0] = [0, 0, 0]  # Make background black in the overlay
+            # Check the prepared input shape
+            st.write(f"Prepared input shape for the model: {img_array.shape}")
 
-        # Display segmentation results
-        st.image(overlay, caption="Segmented Watch", use_column_width=True)
+            # Run inference using the UNet model
+            st.write("Running segmentation... Please wait.")
+            prediction = model.predict(img_array)
+            segmented_image = np.squeeze(prediction)  # Remove batch dimension
 
-        # Save and provide a download button for the segmented image
-        output_image_path = "/tmp/segmented_watch.png"
-        Image.fromarray(overlay).save(output_image_path)
+            # Convert segmentation mask to binary image and overlay
+            mask = (segmented_image > 0.5).astype(np.uint8)  # Binarize mask
+            overlay = np.array(img_resized)
+            overlay[mask == 0] = [0, 0, 0]  # Black out the background
 
-        st.download_button(
-            "Download Segmented Image",
-            data=open(output_image_path, "rb"),
-            file_name="segmented_watch.png",
-            help="Click to download the segmented watch image."
-        )
+            # Display segmentation results
+            st.image(overlay, caption="Segmented Watch", use_column_width=True)
+
+            # Save and provide a download button for the segmented image
+            output_image_path = "/tmp/segmented_watch.png"
+            Image.fromarray(overlay).save(output_image_path)
+
+            st.download_button(
+                "Download Segmented Image",
+                data=open(output_image_path, "rb"),
+                file_name="segmented_watch.png",
+                help="Click to download the segmented watch image."
+            )
+        except Exception as e:
+            st.error(f"Error during preprocessing or prediction: {e}")
 
 # Page: About
 elif page == "About":
@@ -138,10 +147,10 @@ elif page == "About":
     """, unsafe_allow_html=True)
     st.write("""
     ### Features:
-    - Upload an image of a watch for segmentation.
+    - Upload an image for segmentation of watch.
     - Download the segmented image.
     - Built with Streamlit and TensorFlow.
 
     ### Contact:
-    For inquiries or issues, please contact [Monica](mailto:monica@example.com).
+    For inquiries or issues, please contact [Monica](mailto:evangelinemonica18@gmail.com).
     """)
