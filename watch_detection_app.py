@@ -2,7 +2,7 @@ from tensorflow.keras.utils import register_keras_serializable
 import tensorflow as tf
 import os
 import requests
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 import streamlit as st
 from tensorflow.keras.preprocessing.image import img_to_array
@@ -57,6 +57,10 @@ st.markdown("""
             padding: 12px 20px;
             font-size: 16px;
         }
+        .feedback {
+            font-size: 18px;
+            color: #444;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -97,7 +101,12 @@ if page == "Watch Segmentation":
     if uploaded_file is not None:
         # Open the image using PIL
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
+        
+        # Display image and results side by side
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
 
         # Check model input shape
         model_input_shape = model.input_shape
@@ -121,10 +130,14 @@ if page == "Watch Segmentation":
             # Convert segmentation mask to binary image and overlay
             mask = (segmented_image > 0.5).astype(np.uint8)  # Binarize mask
             overlay = np.array(img_resized)
-            overlay[mask == 0] = [0, 0, 0]  # Black out the background
 
-            # Display segmentation results
-            st.image(overlay, caption="Segmented Watch", use_column_width=True)
+            # Apply grayscale to background and keep watch in color
+            grayscale_background = ImageOps.grayscale(img_resized)  # Convert to grayscale
+            grayscale_background = np.array(grayscale_background)
+            overlay[mask == 0] = grayscale_background[mask == 0]  # Apply grayscale background
+
+            with col2:
+                st.image(overlay, caption="Segmented Watch", use_column_width=True)
 
             # Save and provide a download button for the segmented image
             output_image_path = "/tmp/segmented_watch.png"
@@ -138,6 +151,12 @@ if page == "Watch Segmentation":
             )
         except Exception as e:
             st.error(f"Error during preprocessing or prediction: {e}")
+
+        # User feedback section
+        st.markdown('<div class="feedback">Your feedback is valuable! Please provide feedback on the segmentation results:</div>', unsafe_allow_html=True)
+        feedback = st.text_area("Enter your feedback here:", "")
+        if feedback:
+            st.write("Thank you for your feedback!")
 
 # Page: About
 elif page == "About":
@@ -154,6 +173,12 @@ elif page == "About":
     - Download the segmented image.
     - Built with Streamlit and TensorFlow.
 
+    ### User Manual:
+    1. Upload an image of a watch by clicking on the "Upload Image" button.
+    2. The app will process the image and display the segmented watch with the background in grayscale.
+    3. You can download the segmented image by clicking the "Download Segmented Image" button.
+    4. Please provide your feedback on the results for improvements.
+
     ### Contact:
-    For inquiries or issues, please contact [Monica](mailto:evangelinemonica18@gmail.com).
+    For inquiries or issues, please contact [Evangeline Monica](mailto:s2123599@siswa.um.edu.my).
     """)
