@@ -62,7 +62,7 @@ st.markdown("""
 
 # Sidebar Navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Watch Segmentation", "About"])
+tab = st.sidebar.radio("Select Tab", ["Watch Segmentation", "Feedbacks", "About"])
 
 # Define model path and Google Drive file ID
 model_path = "/tmp/unet.keras"
@@ -86,8 +86,8 @@ except Exception as e:
     st.error(f"Error loading model: {e}")
     st.stop()
 
-# Page: Watch Segmentation
-if page == "Watch Segmentation":
+# Watch Segmentation Tab
+if tab == "Watch Segmentation":
     st.markdown('<div class="title">⌚ Watch Segmentation with UNet ⌚</div>', unsafe_allow_html=True)
     st.markdown('<div class="description">Upload an image of a watch, and the UNet model will segment it for you.</div>', unsafe_allow_html=True)
 
@@ -97,7 +97,6 @@ if page == "Watch Segmentation":
     if uploaded_file is not None:
         # Open the image using PIL
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True, clamp=True)
 
         # Check model input shape
         model_input_shape = model.input_shape
@@ -132,9 +131,9 @@ if page == "Watch Segmentation":
             # Display images side by side
             col1, col2 = st.columns(2)
             with col1:
-                st.image(img_resized, caption="Original Image", use_column_width=True)
-            with col2:
                 st.image(overlay, caption="Segmented Watch", use_column_width=True)
+            with col2:
+                st.image(img_resized, caption="Original Image", use_column_width=True)
 
             # Save and provide a download button for the segmented image
             output_image_path = "/tmp/segmented_watch.png"
@@ -153,14 +152,35 @@ if page == "Watch Segmentation":
             if st.button("Submit Feedback"):
                 if feedback:
                     st.success("Thank you for your feedback!")
-                    # Here you can save or send the feedback as needed (e.g., save to a file, database, etc.)
+                    # You can add logic here to save the feedback to a file or send it via email
+                    # Example: save feedback to a text file
+                    with open("feedback.txt", "a") as f:
+                        f.write(feedback + "\n")
                 else:
                     st.warning("Please enter some feedback before submitting.")
         except Exception as e:
             st.error(f"Error during preprocessing or prediction: {e}")
 
-# Page: About
-elif page == "About":
+# Feedback Tab
+elif tab == "Feedbacks":
+    st.markdown('<div class="title">User Feedbacks</div>', unsafe_allow_html=True)
+
+    # Read feedbacks from the file
+    if os.path.exists("feedback.txt"):
+        with open("feedback.txt", "r") as f:
+            feedbacks = f.readlines()
+
+        if feedbacks:
+            st.write("Here are the feedbacks:")
+            for feedback in feedbacks:
+                st.write(f"- {feedback}")
+        else:
+            st.write("No feedbacks yet.")
+    else:
+        st.write("No feedbacks file found.")
+
+# About Tab
+elif tab == "About":
     st.markdown('<div class="title">About This Project</div>', unsafe_allow_html=True)
     st.markdown("""
         <div class="description">
