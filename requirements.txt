@@ -5,3 +5,5 @@ numpy
 opencv-python-headless
 requests
 gdown
+google-cloud-aiplatform
+google-cloud-logging
