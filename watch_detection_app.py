@@ -66,7 +66,7 @@ page = st.sidebar.radio("Go to", ["Watch Segmentation", "About"])
 
 # Define model path and Google Drive file ID
 model_path = "/tmp/unet.keras"
-google_drive_file_id = "1YWxs3feor6QgdaJwRERY2yqcK4_TGCVK"  # Replace with your actual file ID
+google_drive_file_id = "11MstxV8kt1fEHiLtnAe38kjgU7ru9xik"  # Replace with your actual file ID
 
 # Download the model if it doesn't exist
 if not os.path.exists(model_path):
